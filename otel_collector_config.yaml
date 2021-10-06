@@ -1,0 +1,21 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:55680
+      http:
+        endpoint: 0.0.0.0:55681
+exporters:
+  otlphttp:
+    endpoint: "${DT_OTLPHTTP_ENDPOINT}"
+    headers: {"Authorization": "Api-Token ${DT_API_TOKEN}"}
+  logging:
+    loglevel: debug
+    sampling_initial: 5
+    sampling_thereafter: 200
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: []
+      exporters: [logging,otlphttp]

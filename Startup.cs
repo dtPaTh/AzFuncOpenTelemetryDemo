@@ -39,7 +39,7 @@ namespace AzFuncQueueDemo
                     //.AddHttpClientInstrumentation() doesn't work:  https://github.com/Azure/azure-functions-host/issues/7135
                     .AddOtlpExporter(otlpOptions =>
                     {
-                        otlpOptions.Endpoint = new Uri(Environment.GetEnvironmentVariable("CollectorUrl") ?? "http://localhost:55680");
+                        otlpOptions.Endpoint = new Uri(Environment.GetEnvironmentVariable("OTLPEndpoint") ?? "http://localhost:55680");
                     }).Build();
             });
             
