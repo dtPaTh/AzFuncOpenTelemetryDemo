@@ -59,8 +59,9 @@ namespace OpenTelemetryDemo
         [FunctionName("WebTrigger")]
         public async Task<IActionResult> RunWebTrigger([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = null)] HttpRequest req, ILogger log)
         {
-            //create root-span setting tracecontext read from http-headers
-            using (var activity = _activitySource.StartActivity("WebTrigger", ActivityKind.Producer, req.Headers["traceparent"]))
+            //create root-span using extension method provided in Dynatrace.OpenTelemetry.Instruemntation,
+            //that automatically propagates tracecontext from incoming httprequest object
+            using (var activity = _activitySource.StartActivity("WebTrigger", ActivityKind.Producer, req)) 
             {
                 //follow semantic conventions for messaging: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/messaging.md
                 activity?.AddTag("peer.service", "ServiceBus");
