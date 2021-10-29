@@ -1,10 +1,10 @@
 # Trace Azure Functions
 
-Tracing Azure Functions (runtime <= v3) for .NET Core    can be tricky due to limitations of the Azure Function runtime: 
+To trace Azure Functions with OpenTelemetry for .NET Core, certain limitations of the Azure Function runtime apply: 
 * https://github.com/Azure/azure-functions-host/issues/7135 Unable to use auto-instrumentation (e.g. HttpClient, SQLClien) provided within .NET framework
 * https://github.com/open-telemetry/opentelemetry-dotnet/issues/1803#issuecomment-800608308 Unable to intialize Opentelemetry using AddOpenTelemetryTracing extension method
-**Note** 
 
+**Note** 
 The following sample demonstrates end-2-end traceability using OpenTelemetry. 
 
 ## The Demo-Setup
@@ -23,7 +23,9 @@ instrumentations read here: https://github.com/open-telemetry/opentelemetry-dotn
 While the .NET framework provides a broad set of [auto-instrumentation](https://github.com/open-telemetry/opentelemetry-dotnet) for e.g. Sqlclient or Asp.Net Core - due to the current 
 limitations developers need to take care of instrumentation and context-propagation. 
 
-A minimum instrumentation is applied by creatig root-spans within every function and passing the trace-context where needed (e.g. incoming/outgoing http calls).
+An alternative auto-instrumentation library (Dynatrace.OpenTelemetry.Instrumentation) is provided to demonstrate how to reduce boilerplate code for replace missing instrumentation using e.g. httpclient. 
+
+A minimum custom instrumentation is applied by creatig root-spans within every function and passing the trace-context where needed (e.g. incoming http-calls or queue messages).
 
 # Sending traces to Dynatrace
 Dynatrace supports ingestion of traces using the OTLP/HTTP format. To ingest traces exported from instrumented application using the OTLP/GRPC, you have to use an OpenTelemetry colllector. 

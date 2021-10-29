@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFramework>netcoreapp3.1</TargetFramework>
     <AzureFunctionsVersion>v3</AzureFunctionsVersion>
@@ -7,20 +7,19 @@
     <DefineConstants>TRACE</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.3.0-beta.1" />
-    <PackageReference Include="Dynatrace.OneAgent.Sdk" Version="1.7.1" />
+    <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.4.0" />
     <PackageReference Include="Microsoft.Azure.Functions.Extensions" Version="1.1.0" />
     <PackageReference Include="Microsoft.Azure.WebJobs.Extensions.ServiceBus" Version="4.1.0" />
-    <PackageReference Include="Microsoft.Azure.WebJobs.Extensions.Storage" Version="5.0.0-beta.5" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="6.0.0-rc.1.21451.13" />
+    <PackageReference Include="Microsoft.Azure.WebJobs.Extensions.Storage" Version="5.0.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="5.0.2" />
     <PackageReference Include="Microsoft.NET.Sdk.Functions" Version="3.0.13" />
     <PackageReference Include="OpenTelemetry" Version="1.1.0" />
     <PackageReference Include="OpenTelemetry.Exporter.Console" Version="1.1.0" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.1.0" />
-    <PackageReference Include="OpenTelemetry.Exporter.Zipkin" Version="1.1.0" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.0.0-rc7" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.0.0-rc7" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.0.0-rc7" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Dynatrace.OpenTelemetry.Instrumentation\Dynatrace.OpenTelemetry.Instrumentation.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Update="host.json">

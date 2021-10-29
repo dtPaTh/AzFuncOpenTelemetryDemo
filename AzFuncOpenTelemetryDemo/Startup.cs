@@ -1,4 +1,5 @@
-﻿using Microsoft.Azure.Functions.Extensions.DependencyInjection;
+﻿using Dynatrace.OpenTelemetry.Instrumentation.Http;
+using Microsoft.Azure.Functions.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using OpenTelemetry;
 using OpenTelemetry.Resources;
@@ -14,10 +15,10 @@ namespace AzFuncQueueDemo
 {
     public class Startup : FunctionsStartup
     {
+
         //Defines the OpenTelemetry resource attribute "service.name" which is mandatory
         private const string servicename = "AzFuncQueueDemo";
-
-        //Defines the OpenTelemetry Instrumentation Library.
+        //Defines the OpenTelemetry instrumentation library
         private const string activitySource = "OpenTelemetryDemo.AzFuncQueueDemo";
   
         public override void Configure(IFunctionsHostBuilder builder)
@@ -33,16 +34,27 @@ namespace AzFuncQueueDemo
             builder.Services.AddSingleton((builder) =>
             {
                 return Sdk.CreateTracerProviderBuilder()
-                    .AddSource(activitySource)
                     .SetSampler(new AlwaysOnSampler())
-                    .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(servicename))
-                    //.AddHttpClientInstrumentation() doesn't work:  https://github.com/Azure/azure-functions-host/issues/7135
                     .AddOtlpExporter(otlpOptions =>
                     {
                         otlpOptions.Endpoint = new Uri(Environment.GetEnvironmentVariable("OTLPEndpoint") ?? "http://localhost:55680");
-                    }).Build();
+                    })
+                    .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(servicename))
+                    .AddSource(activitySource) //register activitysource used for custom instrumentation
+                    //.AddHttpClientInstrumentation() doesn't work:  https://github.com/Azure/azure-functions-host/issues/7135 ...
+                    //..instead use an alternative instrumentation not relying on DiagnosticListener...
+                    .AddTraceMessageHandlerInstrumentation()  //Requires to use TraceMessageHandler as registered below
+                    .Build();
             });
-            
+
+            //Register TraceMessageHandler and a httpclient using it. 
+            builder.Services.AddTransient<TraceMessageHandler>();
+            builder.Services.AddHttpClient("traced-client")
+                .AddHttpMessageHandler<TraceMessageHandler>();
+
+            //For easier handling, use a typed httpclient (optional) https://docs.microsoft.com/en-us/dotnet/architecture/microservices/implement-resilient-applications/use-httpclientfactory-to-implement-resilient-http-requests
+            builder.Services.AddTransient<TracedHttpClient>();
+
         }
     }
 }

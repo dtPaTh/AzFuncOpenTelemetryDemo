@@ -15,6 +15,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using OpenTelemetry.Exporter;
 using AzFuncQueueDemo;
+using Dynatrace.OpenTelemetry.Instrumentation.Http;
 
 namespace OpenTelemetryDemo
 {
@@ -25,49 +26,40 @@ namespace OpenTelemetryDemo
         private const string envSBConnectionStr = "SBConnection";
         private const string QueueName = "workitems";
 
-        //message property used by servicebus client sdk to pass trace context
+        //message property used by servicebus client sdk to pass trace context: https://docs.microsoft.com/en-us/azure/service-bus-messaging/service-bus-end-to-end-tracing?tabs=net-standard-sdk-2
         private const string contextProperty = "Diagnostic-Id";
 
-        ActivitySource _activitySource;
-        TracerProvider _traceProvider;
+        //Dependency Injected:
+        //ActivitySource registered with TraceProvider for custom instrumentation
+        private ActivitySource _activitySource;
+        //Instrumented httpclient
+        private HttpClient _httpClient;
 
-        public AzFuncQueueDemo(ActivitySource activitySource, TracerProvider traceProvider)
+        //TraceProvider is mandatory to be present in context for the actibitysource
+        public AzFuncQueueDemo(ActivitySource activitySource, TracerProvider traceProvider, TracedHttpClient client)
         {
             _activitySource = activitySource;
-            _traceProvider = traceProvider;
+            _httpClient = client.Client;
         }
 
         [FunctionName("TimerTrigger")]
         public async Task RunTrigger([TimerTrigger("0 */1 * * * *")]TimerInfo myTimer, ILogger log)
         {
-
             //create root-span
             using (var activity = _activitySource.StartActivity("Trigger", ActivityKind.Server))
             {
+                var res = await _httpClient.GetAsync(Environment.GetEnvironmentVariable("WebTriggerUrl") ?? "http://localhost:7071/api/WebTrigger");
 
-                var client = new HttpClient();
-
-                //HttpClient requires custom context propagation: https://github.com/Azure/azure-functions-host/issues/7135
-                if (activity != null)
-                    client.DefaultRequestHeaders.Add("traceparent", activity.Id);
-
-                var targetUrl = Environment.GetEnvironmentVariable("WebTriggerUrl") ?? "http://localhost:7071/api/WebTrigger";
-
-                var res = await client.GetAsync(targetUrl);
-
-                if (res.IsSuccessStatusCode)
-                    log.LogInformation("Successfully called WebTrigger");
-                else
+                if (!res.IsSuccessStatusCode)
                     log.LogWarning("Failed calling WebTrigger");
-
             }
-
         }
 
 
         [FunctionName("WebTrigger")]
         public async Task<IActionResult> RunWebTrigger([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = null)] HttpRequest req, ILogger log)
         {
+            //create root-span setting tracecontext read from http-headers
             using (var activity = _activitySource.StartActivity("WebTrigger", ActivityKind.Producer, req.Headers["traceparent"]))
             {
                 //follow semantic conventions for messaging: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/messaging.md
@@ -78,35 +70,24 @@ namespace OpenTelemetryDemo
 
                 var client = new ServiceBusClient(Environment.GetEnvironmentVariable(envSBConnectionStr));
 
-                //client framework automatically tags message. no need for custom propagation
+                //client framework automatically does context-propagation on messages https://docs.microsoft.com/en-us/azure/service-bus-messaging/service-bus-end-to-end-tracing?tabs=net-standard-sdk-2
                 var sender = client.CreateSender(QueueName);
-
-                // Create a new message to send to the queue
-                var message = new ServiceBusMessage($"Message {DateTime.Now}");
-                log.LogInformation($"Sending message: {message}");
-
-                // Send the message to the queue
-                await sender.SendMessageAsync(message);
+                await sender.SendMessageAsync(new ServiceBusMessage($"Message {DateTime.Now}"));
             }
 
             return new OkObjectResult("Ok");
-     
         }
         
         
         [FunctionName("Consumer")]
         public async Task RunConsumer([ServiceBusTrigger(QueueName, Connection = envSBConnectionStr)] Message myQueueItem, ILogger log)
         {
-            string tracecontext="";
+            //read tracecontext from message payload: https://docs.microsoft.com/en-us/azure/service-bus-messaging/service-bus-end-to-end-tracing?tabs=net-standard-sdk-2
+            string tracecontext ="";
             if (myQueueItem.UserProperties.ContainsKey(contextProperty))
-            {
                 tracecontext = myQueueItem.UserProperties[contextProperty] as string;
-                log.LogInformation($"C# Queue trigger function processed: {myQueueItem} with tracecontext '{tracecontext}'");
-            }
-            else
-                log.LogInformation($"C# Queue trigger function processed: {myQueueItem} without tracecontext");
 
-            //create root-span, connecting with trace-parent read from a message property
+            //create root-span, setting tracecontext 
             using (var activity = _activitySource.StartActivity("Consumer", ActivityKind.Consumer, tracecontext))
             {
                 //follow semantic conventions for messaging: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/messaging.md
@@ -115,21 +96,13 @@ namespace OpenTelemetryDemo
                 activity?.AddTag("messaging.destination", QueueName);
                 activity?.AddTag("messaging.destination_kind", "queue");
 
-
                 //call another service which is instrumented with OneAgent
                 var outboundServiceUrl = Environment.GetEnvironmentVariable("OutboundServiceUrl");
                 if (!String.IsNullOrEmpty(outboundServiceUrl))
                 {
-                    var client = new HttpClient();
-                    //HttpClient requires custom context propagation: https://github.com/Azure/azure-functions-host/issues/7135
-                    if (activity != null)
-                        client.DefaultRequestHeaders.Add("traceparent", activity.Id);
-
-                    var res = await client.GetAsync(outboundServiceUrl);
-                    if (res.IsSuccessStatusCode)
-                        log.LogInformation("Successfully called outbound Service");
-                    else
-                        activity.AddEvent(new ActivityEvent("Unable to call outbound service. Service returned an error"));
+                    var res = await _httpClient.GetAsync(outboundServiceUrl);
+                    if (!res.IsSuccessStatusCode)
+                        log.LogInformation("Failed calling outbound Service");
                 }
                    
             }
