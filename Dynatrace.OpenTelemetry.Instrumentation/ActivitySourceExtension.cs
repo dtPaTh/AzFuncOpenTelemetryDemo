@@ -14,7 +14,7 @@ namespace Dynatrace.OpenTelemetry.Instrumentation.Http
 {
     public static class ActivitySourceExtension
     {
-        public static Activity? StartActivity(this ActivitySource source, string name, ActivityKind kind = ActivityKind.Internal, HttpRequest req= null)
+        public static Activity StartActivity(this ActivitySource source, string name, ActivityKind kind = ActivityKind.Internal, HttpRequest req= null)
         {
             if (req != null)
             {
