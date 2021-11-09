@@ -18,5 +18,11 @@ namespace Dynatrace.OpenTelemetry.Instrumentation.Http
             builder.AddSource(InstrumentationConstants.HttpClientActivitySource);
             return builder;
         }
+
+        public static TracerProviderBuilder AddServiceBusSenderInstrumentation(this TracerProviderBuilder builder)
+        {
+            builder.AddSource(InstrumentationConstants.ServiceBusActivitySource);
+            return builder;
+        }
     }
 }

@@ -9,16 +9,21 @@ using Microsoft.Azure.ServiceBus;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.Extensions.Logging;
-using OpenTelemetry;
-using OpenTelemetry.Context.Propagation;
-using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
-using OpenTelemetry.Exporter;
-using AzFuncQueueDemo;
+using Dynatrace.OpenTelemetry.Instrumentation;
 using Dynatrace.OpenTelemetry.Instrumentation.Http;
+using Dynatrace.OpenTelemetry.Instrumentation.ServiceBus;
 
 namespace OpenTelemetryDemo
 {
+    /// <summary>
+    /// Azure Function Demo
+    /// 
+    /// Note: Comments marked with //Todo: highlight the added instrumentation for tracing 
+    /// using Dynatrace.OpenTelemetry.Instrumentation as an alternative to the native Instrumentation provided 
+    /// which is not working due to missing DiagnosticLinsteners in Azure Functions (https://github.com/Azure/azure-functions-host/issues/7135)
+    /// 
+    /// </summary>
     public class AzFuncQueueDemo
     {
 
@@ -26,16 +31,16 @@ namespace OpenTelemetryDemo
         private const string envSBConnectionStr = "SBConnection";
         private const string QueueName = "workitems";
 
-        //message property used by servicebus client sdk to pass trace context: https://docs.microsoft.com/en-us/azure/service-bus-messaging/service-bus-end-to-end-tracing?tabs=net-standard-sdk-2
-        private const string contextProperty = "Diagnostic-Id";
 
-        //Dependency Injected:
+        //Todo: Dependency Injection
         //ActivitySource registered with TraceProvider for custom instrumentation
         private ActivitySource _activitySource;
+
         //Instrumented httpclient
         private HttpClient _httpClient;
-
-        //TraceProvider is mandatory to be present in context for the actibitysource
+        
+        //Todo: TraceProvider is mandatory to be present in context for the actibitysource
+        //ActivitySource and TracedHttpClient are DI for easier handling tor educe boilerplate code.
         public AzFuncQueueDemo(ActivitySource activitySource, TracerProvider traceProvider, TracedHttpClient client)
         {
             _activitySource = activitySource;
@@ -45,7 +50,7 @@ namespace OpenTelemetryDemo
         [FunctionName("TimerTrigger")]
         public async Task RunTrigger([TimerTrigger("0 */1 * * * *")]TimerInfo myTimer, ILogger log)
         {
-            //create root-span
+            //Todo: create root-span
             using (var activity = _activitySource.StartActivity("Trigger", ActivityKind.Server))
             {
                 var res = await _httpClient.GetAsync(Environment.GetEnvironmentVariable("WebTriggerUrl") ?? "http://localhost:7071/api/WebTrigger");
@@ -59,21 +64,17 @@ namespace OpenTelemetryDemo
         [FunctionName("WebTrigger")]
         public async Task<IActionResult> RunWebTrigger([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = null)] HttpRequest req, ILogger log)
         {
-            //create root-span using extension method provided in Dynatrace.OpenTelemetry.Instruemntation,
+            //Todo: create root-span using extension method provided in Dynatrace.OpenTelemetry.Instrumentation,
             //that automatically propagates tracecontext from incoming httprequest object
-            using (var activity = _activitySource.StartActivity("WebTrigger", ActivityKind.Producer, req)) 
+            using (var activity = _activitySource.StartActivity("WebTrigger", ActivityKind.Server, req)) 
             {
-                //follow semantic conventions for messaging: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/messaging.md
-                activity?.AddTag("peer.service", "ServiceBus");
-                activity?.AddTag("messaging.system", "ServiceBus");
-                activity?.AddTag("messaging.destination", QueueName);
-                activity?.AddTag("messaging.destination_kind", "queue");
-
                 var client = new ServiceBusClient(Environment.GetEnvironmentVariable(envSBConnectionStr));
-
-                //client framework automatically does context-propagation on messages https://docs.microsoft.com/en-us/azure/service-bus-messaging/service-bus-end-to-end-tracing?tabs=net-standard-sdk-2
-                var sender = client.CreateSender(QueueName);
+                
+                //Todo: use an instrumented version of the ServiceBusSender
+                var sender = new TracedServiceBusSender(client.CreateSender(QueueName));
+          
                 await sender.SendMessageAsync(new ServiceBusMessage($"Message {DateTime.Now}"));
+                
             }
 
             return new OkObjectResult("Ok");
@@ -83,20 +84,10 @@ namespace OpenTelemetryDemo
         [FunctionName("Consumer")]
         public async Task RunConsumer([ServiceBusTrigger(QueueName, Connection = envSBConnectionStr)] Message myQueueItem, ILogger log)
         {
-            //read tracecontext from message payload: https://docs.microsoft.com/en-us/azure/service-bus-messaging/service-bus-end-to-end-tracing?tabs=net-standard-sdk-2
-            string tracecontext ="";
-            if (myQueueItem.UserProperties.ContainsKey(contextProperty))
-                tracecontext = myQueueItem.UserProperties[contextProperty] as string;
-
-            //create root-span, setting tracecontext 
-            using (var activity = _activitySource.StartActivity("Consumer", ActivityKind.Consumer, tracecontext))
+            //Todo: create root-span using extension method provided in Dynatrace.OpenTelemetry.Instrumentation,
+            //that automatically propagates tracecontext from incoming message object
+            using (var activity = _activitySource.StartActivity("Consumer", ActivityKind.Consumer, QueueName, myQueueItem))
             {
-                //follow semantic conventions for messaging: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/semantic_conventions/messaging.md
-                activity?.AddTag("peer.service", "ServiceBus");
-                activity?.AddTag("messaging.system", "ServiceBus");
-                activity?.AddTag("messaging.destination", QueueName);
-                activity?.AddTag("messaging.destination_kind", "queue");
-
                 //call another service which is instrumented with OneAgent
                 var outboundServiceUrl = Environment.GetEnvironmentVariable("OutboundServiceUrl");
                 if (!String.IsNullOrEmpty(outboundServiceUrl))

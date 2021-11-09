@@ -13,9 +13,10 @@ using System.Text;
 
 namespace AzFuncQueueDemo
 {
+
+    
     public class Startup : FunctionsStartup
     {
-
         //Defines the OpenTelemetry resource attribute "service.name" which is mandatory
         private const string servicename = "AzFuncQueueDemo";
         //Defines the OpenTelemetry instrumentation library
@@ -25,10 +26,6 @@ namespace AzFuncQueueDemo
         {
             //Using insecure channel: https://github.com/open-telemetry/opentelemetry-dotnet/blob/main/src/OpenTelemetry.Exporter.OpenTelemetryProtocol/README.md#special-case-when-using-insecure-channel
             AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
-            
-            builder.Services.AddSingleton<ActivitySource>((s) => {
-                return new ActivitySource(activitySource);
-            });
 
             //Do not use AddOpenTelemetryTracing (https://github.com/open-telemetry/opentelemetry-dotnet/issues/1803#issuecomment-800608308)
             builder.Services.AddSingleton((builder) =>
@@ -40,10 +37,11 @@ namespace AzFuncQueueDemo
                         otlpOptions.Endpoint = new Uri(Environment.GetEnvironmentVariable("OTLPEndpoint") ?? "http://localhost:55680");
                     })
                     .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(servicename))
-                    .AddSource(activitySource) //register activitysource used for custom instrumentation
                     //.AddHttpClientInstrumentation() doesn't work:  https://github.com/Azure/azure-functions-host/issues/7135 ...
                     //..instead use an alternative instrumentation not relying on DiagnosticListener...
-                    .AddTraceMessageHandlerInstrumentation()  //Requires to use TraceMessageHandler as registered below
+                    .AddTraceMessageHandlerInstrumentation()  //Requires to use TraceMessageHandler as a DelegationHandler for HttpClient (registered below)
+                    .AddServiceBusSenderInstrumentation()  //Requires to use TracedServiceBusSender vs ServiceBusSender
+                    .AddSource(activitySource) //register activitysource used for custom instrumentation
                     .Build();
             });
 
@@ -52,8 +50,15 @@ namespace AzFuncQueueDemo
             builder.Services.AddHttpClient("traced-client")
                 .AddHttpMessageHandler<TraceMessageHandler>();
 
-            //For easier handling, use a typed httpclient (optional) https://docs.microsoft.com/en-us/dotnet/architecture/microservices/implement-resilient-applications/use-httpclientfactory-to-implement-resilient-http-requests
+            //For easier handling, use a typed httpclient https://docs.microsoft.com/en-us/dotnet/architecture/microservices/implement-resilient-applications/use-httpclientfactory-to-implement-resilient-http-requests
+            //available from Dynatrace.OpenTelemetry.Instrumentation (optional) 
             builder.Services.AddTransient<TracedHttpClient>();
+
+            //For easier handling, DI ActivitySource (optional)         
+            builder.Services.AddSingleton<ActivitySource>((s) => {
+                return new ActivitySource(activitySource);
+            });
+
 
         }
     }
