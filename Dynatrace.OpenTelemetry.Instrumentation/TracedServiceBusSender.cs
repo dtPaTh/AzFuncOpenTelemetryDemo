@@ -29,8 +29,9 @@ namespace Dynatrace.OpenTelemetry.Instrumentation.ServiceBus
 
         public override Task SendMessageAsync(ServiceBusMessage message, CancellationToken cancellationToken = default)
         {
-            using (var prod = _activitySource.StartActivity("SendMessageAsync", _sender))
+            using (var activity = _activitySource.StartActivity("SendMessageAsync", _sender))
             {
+                Propagators.DefaultTextMapPropagator.Inject(new PropagationContext(activity.Context, Baggage.Current), message, ServiceBusMessageContextPropagation.MessagePropertiesSetter);
                 return _sender.SendMessageAsync(message, cancellationToken);
             }
         }
