@@ -64,10 +64,12 @@ If the function service is published to Azure, these parameters have to be appli
 
 
 ## Code Instrumentation 
-OpenTelemetry for .NET provides a broad set of [auto-instrumentation](https://github.com/open-telemetry/opentelemetry-dotnet) for e.g. Sqlclient or HttpClient based on the pre-instrumented .NET Framework. Additioanl frameworks such as the [ServiceBus Client SDK are pre-instrumented](https://docs.microsoft.com/en-us/azure/service-bus-messaging/service-bus-end-to-end-tracing?tabs=net-standard-sdk-2) as well. But due to the current 
-limitations developers need to take care of instrumentation and context-propagation. 
+OpenTelemetry for .NET provides a broad set of [auto-instrumentation](https://github.com/open-telemetry/opentelemetry-dotnet) for e.g. Sqlclient or HttpClient based on the pre-instrumented .NET Framework. Other frameworks such as the [ServiceBus Client SDK are pre-instrumented](https://docs.microsoft.com/en-us/azure/service-bus-messaging/service-bus-end-to-end-tracing?tabs=net-standard-sdk-2) come as well pre-instrumented. But due to the current limitations developers need to take care of instrumentation and context-propagation. 
 
 To reduce instrumentation boilerplate code, such as setting semantic conventions and propagating trace-context, an alternative auto-instrumentation library (Dynatrace.OpenTelemetry.Instrumentation) is provided to reduce additional code to instrument your functions. 
+
+The additional added code for instrumentation is marked with code-comments starting with *//Todo:*
+
 ````
 [FunctionName("WebTrigger")]
 public async Task<IActionResult> RunWebTrigger([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = null)] HttpRequest req, ILogger log)
@@ -119,9 +121,6 @@ namespace AzFuncQueueDemo
         }
     }
 ````
-
-The additional added code for instrumentation is marked with code-comments starting with *//Todo:*
-
 To learn more about .NET instrumentation with Opentelemetry visit [Opentelemetry .NET on Github](https://github.com/open-telemetry/opentelemetry-dotnet/blob/main/src/OpenTelemetry.Api/README.md#instrumenting-a-libraryapplication-with-net-activity-api)
 
 # Sending traces to Dynatrace
