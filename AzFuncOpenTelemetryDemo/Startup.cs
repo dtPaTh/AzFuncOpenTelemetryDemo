@@ -1,9 +1,10 @@
-﻿using Dynatrace.OpenTelemetry.Instrumentation.Http;
-using Microsoft.Azure.Functions.Extensions.DependencyInjection;
+﻿using Microsoft.Azure.Functions.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection;
 using OpenTelemetry;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using Dynatrace.OpenTelemetry;
+using Dynatrace.OpenTelemetry.Instrumentation.Http;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -17,28 +18,20 @@ namespace AzFuncQueueDemo
     
     public class Startup : FunctionsStartup
     {
-        //Defines the OpenTelemetry resource attribute "service.name" which is mandatory
-        private const string servicename = "AzFuncQueueDemo";
-        //Defines the OpenTelemetry instrumentation library
-        private const string activitySource = "OpenTelemetryDemo.AzFuncQueueDemo";
-  
         public override void Configure(IFunctionsHostBuilder builder)
         {
-            //Using insecure channel: https://github.com/open-telemetry/opentelemetry-dotnet/blob/main/src/OpenTelemetry.Exporter.OpenTelemetryProtocol/README.md#special-case-when-using-insecure-channel
-            AppContext.SetSwitch("System.Net.Http.SocketsHttpHandler.Http2UnencryptedSupport", true);
+            //Defines the OpenTelemetry instrumentation library
+            string activitySource = Environment.GetEnvironmentVariable("otel.instrumetnationlibary")??"Custom";
 
-            //Do not use AddOpenTelemetryTracing (https://github.com/open-telemetry/opentelemetry-dotnet/issues/1803#issuecomment-800608308)
+            //Do not use builder.Services.AddOpenTelemetryTracing (https://github.com/open-telemetry/opentelemetry-dotnet/issues/1803#issuecomment-800608308)
             builder.Services.AddSingleton((builder) =>
             {
                 return Sdk.CreateTracerProviderBuilder()
                     .SetSampler(new AlwaysOnSampler())
-                    .AddOtlpExporter(otlpOptions =>
-                    {
-                        otlpOptions.Endpoint = new Uri(Environment.GetEnvironmentVariable("OTLPEndpoint") ?? "http://localhost:55680");
-                    })
-                    .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(servicename))
+                    .AddDynatraceExporter()
+                    .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(Environment.GetEnvironmentVariable("otel.service.name") ??"defaultservice"))
                     //.AddHttpClientInstrumentation() doesn't work:  https://github.com/Azure/azure-functions-host/issues/7135 ...
-                    //..instead use an alternative instrumentation not relying on DiagnosticListener...
+                    //..instead use an alternative instrumentation not relying on DiagnosticListener
                     .AddTraceMessageHandlerInstrumentation()  //Requires to use TraceMessageHandler as a DelegationHandler for HttpClient (registered below)
                     .AddServiceBusSenderInstrumentation()  //Requires to use TracedServiceBusSender vs ServiceBusSender
                     .AddSource(activitySource) //register activitysource used for custom instrumentation
