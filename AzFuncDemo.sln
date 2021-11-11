@@ -7,7 +7,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Dynatrace.OpenTelemetry.Ins
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AzFuncQueueDemo", "AzFuncOpenTelemetryDemo\AzFuncQueueDemo.csproj", "{9F3A56BC-70BB-4DB2-803D-20E8A2B8CBC3}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Dynatrace.OpenTelemetry", "Dynatrace.OpenTelemetry\Dynatrace.OpenTelemetry\Dynatrace.OpenTelemetry.csproj", "{AB2F518C-46FF-443A-99A8-93F9799D88BB}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Dynatrace.OpenTelemetry", "Dynatrace.OpenTelemetry\Dynatrace.OpenTelemetry.csproj", "{C6CD6736-DD57-4D97-9EB6-DE52CDB6B177}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -23,10 +23,10 @@ Global
 		{9F3A56BC-70BB-4DB2-803D-20E8A2B8CBC3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{9F3A56BC-70BB-4DB2-803D-20E8A2B8CBC3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{9F3A56BC-70BB-4DB2-803D-20E8A2B8CBC3}.Release|Any CPU.Build.0 = Release|Any CPU
-		{AB2F518C-46FF-443A-99A8-93F9799D88BB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{AB2F518C-46FF-443A-99A8-93F9799D88BB}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{AB2F518C-46FF-443A-99A8-93F9799D88BB}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{AB2F518C-46FF-443A-99A8-93F9799D88BB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C6CD6736-DD57-4D97-9EB6-DE52CDB6B177}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C6CD6736-DD57-4D97-9EB6-DE52CDB6B177}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C6CD6736-DD57-4D97-9EB6-DE52CDB6B177}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C6CD6736-DD57-4D97-9EB6-DE52CDB6B177}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
