@@ -68,8 +68,57 @@ OpenTelemetry for .NET provides a broad set of [auto-instrumentation](https://gi
 limitations developers need to take care of instrumentation and context-propagation. 
 
 To reduce instrumentation boilerplate code, such as setting semantic conventions and propagating trace-context, an alternative auto-instrumentation library (Dynatrace.OpenTelemetry.Instrumentation) is provided to reduce additional code to instrument your functions. 
+````
+[FunctionName("WebTrigger")]
+public async Task<IActionResult> RunWebTrigger([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = null)] HttpRequest req, ILogger log)
+{
+    //Todo: create root-span using extension method provided in Dynatrace.OpenTelemetry.Instrumentation,
+    //that automatically propagates tracecontext from incoming httprequest object
+    using (var activity = _activitySource.StartActivity("WebTrigger", ActivityKind.Server, req)) 
+    {
+        var client = new ServiceBusClient(Environment.GetEnvironmentVariable(envSBConnectionStr));
+        
+        //Todo: use an instrumented shim of the ServiceBusSender
+        var sender = new TracedServiceBusSender(client.CreateSender(QueueName));
+  
+        await sender.SendMessageAsync(new ServiceBusMessage($"Message {DateTime.Now}"));
+        
+    }
+
+    return new OkObjectResult("Ok");
+}
+````
 
 OpenTelemetry is initialized using DependencyInjection within the FunctionStartup in Startup.cs. 
+````
+[assembly: FunctionsStartup(typeof(AzFuncQueueDemo.Startup))]
+namespace AzFuncQueueDemo
+{
+    public class Startup : FunctionsStartup
+    {
+        public override void Configure(IFunctionsHostBuilder builder)
+        {
+            //Defines the OpenTelemetry instrumentation library
+            string activitySource = Environment.GetEnvironmentVariable("otel.instrumetnationlibary")??"Custom";
+
+            //Do not use builder.Services.AddOpenTelemetryTracing (https://github.com/open-telemetry/opentelemetry-dotnet/issues/1803#issuecomment-800608308)
+            builder.Services.AddSingleton((builder) =>
+            {
+                return Sdk.CreateTracerProviderBuilder()
+                    .SetSampler(new AlwaysOnSampler())
+                    .AddDynatraceExporter() //Configures to send traces to Dynatrace, automatically reading configuration from environmetn variables.
+                    .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(Environment.GetEnvironmentVariable("otel.service.name") ??"defaultservice"))
+                    //.AddHttpClientInstrumentation() doesn't work:  https://github.com/Azure/azure-functions-host/issues/7135 ...
+                    //..instead use an alternative instrumentation not relying on DiagnosticListener
+                    .AddTraceMessageHandlerInstrumentation()  //Requires to use TraceMessageHandler as a DelegationHandler for HttpClient (registered below)
+                    .AddServiceBusSenderInstrumentation()  //Requires to use TracedServiceBusSender vs ServiceBusSender
+                    .AddSource(activitySource) //register activitysource used for custom instrumentation
+                    .Build();
+            });
+          ...
+        }
+    }
+````
 
 The additional added code for instrumentation is marked with code-comments starting with *//Todo:*
 
