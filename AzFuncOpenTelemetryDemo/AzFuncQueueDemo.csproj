@@ -18,6 +18,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\Dynatrace.OpenTelemetry.Instrumentation\Dynatrace.OpenTelemetry.Instrumentation.csproj" />
+    <ProjectReference Include="..\Dynatrace.OpenTelemetry\Dynatrace.OpenTelemetry\Dynatrace.OpenTelemetry.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Update="host.json">

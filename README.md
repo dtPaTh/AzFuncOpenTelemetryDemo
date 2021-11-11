@@ -89,7 +89,7 @@ public async Task<IActionResult> RunWebTrigger([HttpTrigger(AuthorizationLevel.A
 }
 ````
 
-OpenTelemetry is initialized using DependencyInjection within the FunctionStartup in Startup.cs. 
+OpenTelemetry is initialized using DependencyInjection within the [FunctionStartup](https://docs.microsoft.com/en-us/azure/azure-functions/functions-dotnet-dependency-injection) in Startup.cs. 
 ````
 [assembly: FunctionsStartup(typeof(AzFuncQueueDemo.Startup))]
 namespace AzFuncQueueDemo
@@ -129,7 +129,7 @@ Dynatrace supports ingestion of traces using the OTLP/HTTP binary format. Until 
 
 To reduce complexitity in the demo setup, OpenTelemetry OTLP Exporter for .NET **v1.2.0-beta1** is used. 
 
-Dynatrace.OpenTelemetry library provides a TracerProviderBuilder Extension function which automatically configures the traceprovider to send the traces to Dynatrace. 
+The Dynatrace.OpenTelemetry library provides a TracerProviderBuilder Extension function which automatically configures the Traceprovider to send the traces to Dynatrace. 
 
 See following [instructions to activate the Dynatrace OTLP endpoint](https://www.dynatrace.com/support/help/how-to-use-dynatrace/transactions-and-services/purepath-distributed-traces/opentelemetry-ingest/#activate)
 
