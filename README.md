@@ -2,7 +2,8 @@
 Azure Functions offer a wide range of options   
 * To use your preferred language 
 * To automate deployment
-* With flexible pricing
+* With flexible [hosting](https://docs.microsoft.com/en-us/azure/azure-functions/functions-scale)
+
 to adress the various [scenarios and use-cases](https://docs.microsoft.com/en-us/azure/azure-functions/functions-overview#scenarios).
 
 # Trace Azure Functions
@@ -17,7 +18,9 @@ Limitations:
 * https://github.com/Azure/azure-functions-host/issues/7135 Unable to use auto-instrumentation (e.g. HttpClient, SQLClient) provided within .NET framework
 * https://github.com/open-telemetry/opentelemetry-dotnet/issues/1803#issuecomment-800608308 Unable to intialize Opentelemetry using AddOpenTelemetryTracing extension method
 
-The follwoing sample application demonstrates end-2-end traceability using OpenTelemetry in combination with other workloads monitored with Dynatrace OneAgent.  
+The limitations only apply to function written in [C# (class libaries), C# script (.csx) and F# (.fsx)](https://docs.microsoft.com/en-us/azure/azure-functions/supported-languages#language-support-details) which are executed in the [in-process model](https://docs.microsoft.com/en-us/azure/azure-functions/dotnet-isolated-process-guide#differences-with-net-class-library-functions)
+
+The following sample application demonstrates end-2-end traceability using OpenTelemetry.  
 
 # The Demo Function App
 [TimerTriggerdFunction] -> (http) -> [HttpTriggeredFunction] -> (ServiceBusQueue) -> [ServiceBusTriggeredFunction] -> (http) -> [Outbound Service]
@@ -57,41 +60,25 @@ After checking out the repository create a file named "local.settings.json" in y
 | OutboundServiceUrl | Url of an external service | Optional |
 | OTLPEndpoint | An OTLP capable endpoint to send the trace data. If no value is provided the default endpoint on localhost is used. | Yes |
 | DT_API_TOKEN | Dynatrace API Token with the **Ingest OpenTelemetry traces** (openTelemetryTrace.ingest) scope | Only needed if the OTLP endpoint of Dynatrace is used. Not needed if a collector is used. |
-| otel.service.name | Your service identifier provided as resource attribute "service.name" | Yes |
+| otel.service.name | [Logical name of the service](https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/resource/semantic_conventions/README.md#service) | Yes |
 | otel.instrumentationlibrary | The name to be provided as Instrumentationlibrary for your custom instrumentations | No, defaults to "Custom" |
 
 If the function service is published to Azure, these parameters have to be applied via the [Functions application settings](https://docs.microsoft.com/en-us/azure/azure-functions/functions-how-to-use-azure-function-app-settings?tabs=portal#settings)
 
 
 ## Code Instrumentation 
-OpenTelemetry for .NET provides a broad set of [auto-instrumentation](https://github.com/open-telemetry/opentelemetry-dotnet) for e.g. Sqlclient or HttpClient based on the pre-instrumented .NET Framework. Other frameworks such as the [ServiceBus Client SDK are pre-instrumented](https://docs.microsoft.com/en-us/azure/service-bus-messaging/service-bus-end-to-end-tracing?tabs=net-standard-sdk-2) come as well pre-instrumented. But due to the current limitations developers need to take care of instrumentation and context-propagation. 
-
-To reduce instrumentation boilerplate code, such as setting semantic conventions and propagating trace-context, an alternative auto-instrumentation library (Dynatrace.OpenTelemetry.Instrumentation) is provided to reduce additional code to instrument your functions. 
-
-The additional added code for instrumentation is marked with code-comments starting with *//Todo:*
-
-````
-[FunctionName("WebTrigger")]
-public async Task<IActionResult> RunWebTrigger([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = null)] HttpRequest req, ILogger log)
-{
-    //Todo: create root-span using extension method provided in Dynatrace.OpenTelemetry.Instrumentation,
-    //that automatically propagates tracecontext from incoming httprequest object
-    using (var activity = _activitySource.StartActivity("WebTrigger", ActivityKind.Server, req)) 
-    {
-        var client = new ServiceBusClient(Environment.GetEnvironmentVariable(envSBConnectionStr));
-        
-        //Todo: use an instrumented shim of the ServiceBusSender
-        var sender = new TracedServiceBusSender(client.CreateSender(QueueName));
-  
-        await sender.SendMessageAsync(new ServiceBusMessage($"Message {DateTime.Now}"));
-        
-    }
-
-    return new OkObjectResult("Ok");
-}
-````
-
+### Initializing OpenTelemetry
 OpenTelemetry is initialized using DependencyInjection within the [FunctionStartup](https://docs.microsoft.com/en-us/azure/azure-functions/functions-dotnet-dependency-injection) in Startup.cs. 
+
+#### Sending traces to Dynatrace
+Dynatrace supports ingestion of traces using the OTLP/HTTP binary format. Until OpenTelemetry OTLP Exporter for .NET v1.1.0, only OTLP/GRPC protocol is supported which requires to use an [OpenTelemetry colllector](https://github.com/open-telemetry/opentelemetry-collector) forwarding the traces to Dynatrace. Version 1.2.0, adds support for OTLP/HTTP binary format, allowing to send the traces directly to Dynatrace from your application. 
+
+To reduce complexitity in the demo setup, OpenTelemetry OTLP Exporter for .NET **v1.2.0-beta1** is used. 
+
+The Dynatrace.OpenTelemetry library provides a TracerProviderBuilder Extension (AddDynatraceExporter) function which automatically configures the Traceprovider to send the traces to Dynatrace. 
+
+See following [instructions to activate the Dynatrace OTLP endpoint](https://www.dynatrace.com/support/help/how-to-use-dynatrace/transactions-and-services/purepath-distributed-traces/opentelemetry-ingest/#activate)
+
 ````
 [assembly: FunctionsStartup(typeof(AzFuncQueueDemo.Startup))]
 namespace AzFuncQueueDemo
@@ -121,16 +108,37 @@ namespace AzFuncQueueDemo
         }
     }
 ````
+
+### Instrument your functions 
+OpenTelemetry for .NET provides a broad set of [auto-instrumentation](https://github.com/open-telemetry/opentelemetry-dotnet) for e.g. Sqlclient or HttpClient based on the pre-instrumented .NET Framework. Other frameworks such as the [ServiceBus Client SDK are pre-instrumented](https://docs.microsoft.com/en-us/azure/service-bus-messaging/service-bus-end-to-end-tracing?tabs=net-standard-sdk-2) come as well pre-instrumented. But due to the current limitations developers need to take care of instrumentation and context-propagation. 
+
+To reduce instrumentation boilerplate code, such as setting semantic conventions and propagating trace-context, an alternative auto-instrumentation library (Dynatrace.OpenTelemetry.Instrumentation) is provided to reduce additional code to instrument your functions. 
+
+The additional added code for instrumentation is marked with code-comments starting with *//Instrumentation:*
+
+````
+[FunctionName("WebTrigger")]
+public async Task<IActionResult> RunWebTrigger([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = null)] HttpRequest req, ILogger log)
+{
+    //Instrumentation: create root-span using extension method provided in Dynatrace.OpenTelemetry.Instrumentation,
+    //that automatically propagates tracecontext from incoming httprequest object
+    using (var activity = _activitySource.StartActivity("WebTrigger", ActivityKind.Server, req)) 
+    {
+        var client = new ServiceBusClient(Environment.GetEnvironmentVariable(envSBConnectionStr));
+        
+        //Instrumentation: use an instrumented shim of the ServiceBusSender
+        var sender = new TracedServiceBusSender(client.CreateSender(QueueName));
+  
+        await sender.SendMessageAsync(new ServiceBusMessage($"Message {DateTime.Now}"));
+        
+    }
+
+    return new OkObjectResult("Ok");
+}
+````
+
 To learn more about .NET instrumentation with Opentelemetry visit [Opentelemetry .NET on Github](https://github.com/open-telemetry/opentelemetry-dotnet/blob/main/src/OpenTelemetry.Api/README.md#instrumenting-a-libraryapplication-with-net-activity-api)
 
-# Sending traces to Dynatrace
-Dynatrace supports ingestion of traces using the OTLP/HTTP binary format. Until OpenTelemetry OTLP Exporter for .NET v1.1.0, only OTLP/GRPC protocol is supported which requires to use an [OpenTelemetry colllector](https://github.com/open-telemetry/opentelemetry-collector) forwarding the traces to Dynatrace. Version 1.2.0, adds support for OTLP/HTTP binary format, allowing to send the traces directly to Dynatrace from your application. 
-
-To reduce complexitity in the demo setup, OpenTelemetry OTLP Exporter for .NET **v1.2.0-beta1** is used. 
-
-The Dynatrace.OpenTelemetry library provides a TracerProviderBuilder Extension function which automatically configures the Traceprovider to send the traces to Dynatrace. 
-
-See following [instructions to activate the Dynatrace OTLP endpoint](https://www.dynatrace.com/support/help/how-to-use-dynatrace/transactions-and-services/purepath-distributed-traces/opentelemetry-ingest/#activate)
 
 # Step-By-Step to run the demo
 1. Prepare Dynatrace Environment

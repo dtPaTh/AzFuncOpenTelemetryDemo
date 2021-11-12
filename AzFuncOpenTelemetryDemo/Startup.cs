@@ -28,7 +28,7 @@ namespace AzFuncQueueDemo
             {
                 return Sdk.CreateTracerProviderBuilder()
                     .SetSampler(new AlwaysOnSampler())
-                    .AddDynatraceExporter()
+                    .AddDynatraceExporter() //Configures to send traces to Dynatrace, automatically reading configuration from environmetn variables.
                     .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(Environment.GetEnvironmentVariable("otel.service.name") ??"defaultservice"))
                     //.AddHttpClientInstrumentation() doesn't work:  https://github.com/Azure/azure-functions-host/issues/7135 ...
                     //..instead use an alternative instrumentation not relying on DiagnosticListener
@@ -38,7 +38,7 @@ namespace AzFuncQueueDemo
                     .Build();
             });
 
-            //Register TraceMessageHandler and a httpclient using it. 
+            //Register an instrumented delegationhandler TraceMessageHandler and a httpclient using it. 
             builder.Services.AddTransient<TraceMessageHandler>();
             builder.Services.AddHttpClient("traced-client")
                 .AddHttpMessageHandler<TraceMessageHandler>();

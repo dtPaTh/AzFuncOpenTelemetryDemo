@@ -19,7 +19,7 @@ namespace OpenTelemetryDemo
     /// <summary>
     /// Azure Function Demo
     /// 
-    /// Note: Comments marked with //Todo: highlight the added instrumentation for tracing 
+    /// Note: Comments marked with //Instrumentation: highlight the added instrumentation for tracing 
     /// using Dynatrace.OpenTelemetry.Instrumentation as an alternative to the native Instrumentation provided 
     /// which is not working due to missing DiagnosticLinsteners in Azure Functions (https://github.com/Azure/azure-functions-host/issues/7135)
     /// 
@@ -32,14 +32,14 @@ namespace OpenTelemetryDemo
         private const string QueueName = "workitems";
 
 
-        //Todo: Dependency Injection
+        //Instrumentation: Dependency Injection
         //ActivitySource registered with TraceProvider for custom instrumentation
         private ActivitySource _activitySource;
 
         //Instrumented httpclient
         private HttpClient _httpClient;
         
-        //Todo: TraceProvider is mandatory to be present in context for the actibitysource
+        //Instrumentation: TraceProvider is mandatory to be present in context for the actibitysource
         //ActivitySource and TracedHttpClient are DI for easier handling tor educe boilerplate code.
         public AzFuncQueueDemo(ActivitySource activitySource, TracerProvider traceProvider, TracedHttpClient client)
         {
@@ -50,7 +50,7 @@ namespace OpenTelemetryDemo
         [FunctionName("TimerTrigger")]
         public async Task RunTrigger([TimerTrigger("0 */1 * * * *")]TimerInfo myTimer, ILogger log)
         {
-            //Todo: create root-span
+            //Instrumentation: create root-span
             using (var activity = _activitySource.StartActivity("Trigger", ActivityKind.Server))
             {
                 var res = await _httpClient.GetAsync(Environment.GetEnvironmentVariable("WebTriggerUrl") ?? "http://localhost:7071/api/WebTrigger");
@@ -64,13 +64,13 @@ namespace OpenTelemetryDemo
         [FunctionName("WebTrigger")]
         public async Task<IActionResult> RunWebTrigger([HttpTrigger(AuthorizationLevel.Anonymous, "get", Route = null)] HttpRequest req, ILogger log)
         {
-            //Todo: create root-span using extension method provided in Dynatrace.OpenTelemetry.Instrumentation,
+            //Instrumentation: create root-span using extension method provided in Dynatrace.OpenTelemetry.Instrumentation,
             //that automatically propagates tracecontext from incoming httprequest object
             using (var activity = _activitySource.StartActivity("WebTrigger", ActivityKind.Server, req)) 
             {
                 var client = new ServiceBusClient(Environment.GetEnvironmentVariable(envSBConnectionStr));
                 
-                //Todo: use an instrumented version of the ServiceBusSender
+                //Instrumentation: use an instrumented version of the ServiceBusSender
                 var sender = new TracedServiceBusSender(client.CreateSender(QueueName));
           
                 await sender.SendMessageAsync(new ServiceBusMessage($"Message {DateTime.Now}"));
@@ -84,7 +84,7 @@ namespace OpenTelemetryDemo
         [FunctionName("Consumer")]
         public async Task RunConsumer([ServiceBusTrigger(QueueName, Connection = envSBConnectionStr)] Message myQueueItem, ILogger log)
         {
-            //Todo: create root-span using extension method provided in Dynatrace.OpenTelemetry.Instrumentation,
+            //Instrumentation: create root-span using extension method provided in Dynatrace.OpenTelemetry.Instrumentation,
             //that automatically propagates tracecontext from incoming message object
             using (var activity = _activitySource.StartActivity("Consumer", ActivityKind.Consumer, QueueName, myQueueItem))
             {
