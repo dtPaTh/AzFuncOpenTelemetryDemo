@@ -43,12 +43,13 @@ After checking out the repository create a file named "local.settings.json" in y
     "WebTriggerUrl": "",
     "OutboundServiceUrl": "https://myotherservice.com",
 
-    "OTLPEndpoint": "https://xxxxxxxx.live.dynatrace.com/api/v2/otlp"
-    "DT_API_TOKEN": "xxxxx"
-    
     "otel.service.name": "AzFuncQueueDemo",
-    "otel.instrumetnationlibary": "OpenTelemetryDemo.AzFuncQueueDemo"
+    "otel.instrumetnationlibary": "OpenTelemetryDemo.AzFuncQueueDemo",
 
+    "DT_TENANT": "XXXXX",
+    "DT_CLUSTER_ID": "XXXXX",
+    "DT_CONNECTION_AUTH_TOKEN": "XXXXX",
+    "DT_CONNECTION_BASE_URL": "XXXXX"
   }
 }
 ````
@@ -58,26 +59,41 @@ After checking out the repository create a file named "local.settings.json" in y
 | SBConnection | Azure ServiceBus ConnectionString | Yes |
 | WebTriggerUrl | Url of the HttpTriggered Function  | Yes, if published to Azure, otherwise local endpoint is used as default |
 | OutboundServiceUrl | Url of an external service | Optional |
-| OTLPEndpoint | An OTLP capable endpoint to send the trace data. If no value is provided the default endpoint on localhost is used. | Yes |
-| DT_API_TOKEN | Dynatrace API Token with the **Ingest OpenTelemetry traces** (openTelemetryTrace.ingest) scope | Only needed if the OTLP endpoint of Dynatrace is used. Not needed if a collector is used. |
 | otel.service.name | [Logical name of the service](https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/resource/semantic_conventions/README.md#service) | Yes |
 | otel.instrumentationlibrary | The name to be provided as Instrumentationlibrary for your custom instrumentations | No, defaults to "Custom" |
 
+### Dynatrace Connection Parameters
+
+| Parameter | Description | Required |
+| --- | --- | --- |
+| DT_TENANT | Dynatrace Tenant-Id | Yes |
+| DT_CLUSTER_ID | Dynatrace Cluster-Id | Yes |
+| DT_CONNECTION_AUTH_TOKEN | Dynatrace authentication token | Yes|
+| DT_CONNECTION_BASE_URL | Dynatrace endpoint to send the trace data. | Yes |
+
+The parameters to configure Dynatrace connection parameters can be retrieved via Dynatrace UI in **Deploy Dynatrace > FaaS**
+![End-2-End Trace](dt-config.png)
+
+### Publishing Your Azure Function
 If the function service is published to Azure, these parameters have to be applied via the [Functions application settings](https://docs.microsoft.com/en-us/azure/azure-functions/functions-how-to-use-azure-function-app-settings?tabs=portal#settings)
 
 
 ## Code Instrumentation 
+
+### Prerequisites
+Before you can use dependency injection, OpenTelemetry or the Dynatrace Instrumentation libraries following NuGet packages have to be added to the Function project:
+
+* *Microsoft.Azure.Functions.Extensions*
+* *Microsoft.NET.Sdk.Functions package* version 1.0.28 or later
+* *Microsoft.Extensions.DependencyInjection* (currently, only version 3.x and earlier supported)
+* *Dynatrace.OpenTelemetry*
+* *Dynatrace.OpenTelemetry.Instrumentation*
+
 ### Initializing OpenTelemetry
-OpenTelemetry is initialized using DependencyInjection within the [FunctionStartup](https://docs.microsoft.com/en-us/azure/azure-functions/functions-dotnet-dependency-injection) in Startup.cs. 
+In the sample application, OpenTelemetry is initialized using dependency injection within the [FunctionStartup](https://docs.microsoft.com/en-us/azure/azure-functions/functions-dotnet-dependency-injection) in Startup.cs. While this is not a must, it helps you to keep your function code separated from your functions configuration needs. 
 
 #### Sending traces to Dynatrace
-Dynatrace supports ingestion of traces using the OTLP/HTTP binary format. Until OpenTelemetry OTLP Exporter for .NET v1.1.0, only OTLP/GRPC protocol is supported which requires to use an [OpenTelemetry colllector](https://github.com/open-telemetry/opentelemetry-collector) forwarding the traces to Dynatrace. Version 1.2.0, adds support for OTLP/HTTP binary format, allowing to send the traces directly to Dynatrace from your application. 
-
-To reduce complexitity in the demo setup, OpenTelemetry OTLP Exporter for .NET **v1.2.0-beta1** is used. 
-
 The Dynatrace.OpenTelemetry library provides a TracerProviderBuilder Extension (AddDynatraceExporter) function which automatically configures the Traceprovider to send the traces to Dynatrace. 
-
-See following [instructions to activate the Dynatrace OTLP endpoint](https://www.dynatrace.com/support/help/how-to-use-dynatrace/transactions-and-services/purepath-distributed-traces/opentelemetry-ingest/#activate)
 
 ````
 [assembly: FunctionsStartup(typeof(AzFuncQueueDemo.Startup))]
@@ -164,66 +180,6 @@ The following screenshots show an enhanced setup of the above sample with an inb
 
 ![End-2-End Trace](end-2-end-trace.png)
 ![ServiceFlow](end-2-end-serviceflow.png)
-
-
-# Running the collector as a docker container (optional)
-OpenTelemetry provides a docker image for the collector. To use this image a collector config needs to be applied. 
-
-Within this project a sample collector config is included (otel_collector_config.yaml) which enables OTLP receivers and a OLTP/HTTP sender adding authentication headers. The target endpoint and authentication token is configured through environment variables.  
-```
-receivers:
-  otlp:
-    protocols:
-      grpc:
-        endpoint: 0.0.0.0:55680
-      http:
-        endpoint: 0.0.0.0:55681
-exporters:
-  otlphttp:
-    endpoint: "${DT_OTLPHTTP_ENDPOINT}"
-    headers: {"Authorization": "Api-Token ${DT_API_TOKEN}"}
-  logging:
-    loglevel: debug
-    sampling_initial: 5
-    sampling_thereafter: 200
-service:
-  pipelines:
-    traces:
-      receivers: [otlp]
-      processors: []
-      exporters: [logging,otlphttp]
-```
-
-| Environment Variable | Description | Required |
-| --- | --- | --- |
-| DT_OTLPHTTP_ENDPOINT | Your Dynatrace OTLP Endpoint. Example: https://xxxxxxxx.live.dynatrace.com/api/v2/otlp |
-| DT_API_TOKEN | Your Dynatrace API Token |
-
-### Run a collector as a docker locally for testing 
-
-Linux
-```
-docker run -p 55680:55680 -p 55681:55681 -e DT_OTLPHTTP_ENDPOINT="<YOUR-DYNATRACE-OTLP-ENDPOINT>" -e DT_API_TOKEN="<YOUR-DYNATRACE-API-TOKEN>" -v  $(pwd)/otel_collector_config.yaml:/etc/otel/config.yaml otel/opentelemetry-collector-contrib
-```
-
-Windows Powershell
-```
-docker run -p 55680:55680 -p 55681:55681 -e DT_OTLPHTTP_ENDPOINT="<YOUR-DYNATRACE-OTLP-ENDPOINT>" -e DT_API_TOKEN="<YOUR-DYNATRACE-API-TOKEN>" -v  ${pwd}/otel_collector_config.yaml:/etc/otel/config.yaml otel/opentelemetry-collector-contrib
-```
-
-Your command then may look similar like this if your are using a Dynatrace SaaS endpoint. 
-```
-docker run -p 55680:55680 -p 55681:55681 -e DT_OTLPHTTP_ENDPOINT="https://xxxxxxxx.live.dynatrace.com/api/v2/otlp" -e DT_API_TOKEN="xxxxxx.xxxxxxxxxxxxxxxxxxxxxxxx.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" -v  $(pwd)/otel_collector_config.yaml:/etc/otel/config.yaml otel/opentelemetry-collector-contrib
-```
-### Build a docker image for you collector, you can run in your container platform of choice
-
-Within this project a sample dockerfile is included (otel_collector.Dockerfile) packaging the collector config "otel_collector_config.yaml"
-
-#### Create a docker image to include your OpenTelemetry collector config
-```
-docker build -t dt-otlp-collector . -f otel_collector.Dockerfile
-```
-
 
 
 
