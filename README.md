@@ -20,6 +20,8 @@ Limitations:
 
 The limitations only apply to function written in [C# (class libaries), C# script (.csx) and F# (.fsx)](https://docs.microsoft.com/en-us/azure/azure-functions/supported-languages#language-support-details) which are executed in the [in-process model](https://docs.microsoft.com/en-us/azure/azure-functions/dotnet-isolated-process-guide#differences-with-net-class-library-functions)
 
+**+++UPDATE+++** these limitations are removed with Azure Functions runtime v4! The mentioned instrumentation workarounds a not necessary any longer and a updated tutorial for v4 is in the works.
+
 The following sample application demonstrates end-2-end traceability using OpenTelemetry.  
 
 # The Demo Function App
