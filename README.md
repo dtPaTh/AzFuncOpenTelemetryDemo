@@ -114,8 +114,12 @@ namespace AzFuncQueueDemo
 ### Instrument your functions 
 OpenTelemetry for .NET provides a broad set of [auto-instrumentation](https://github.com/open-telemetry/opentelemetry-dotnet) for e.g. Sqlclient or HttpClient based on the pre-instrumented .NET Framework. Other frameworks such as the [ServiceBus Client SDK are pre-instrumented](https://docs.microsoft.com/en-us/azure/service-bus-messaging/service-bus-end-to-end-tracing?tabs=net-standard-sdk-2) come as well pre-instrumented. But due to the current limitations developers need to take care of instrumentation and context-propagation. 
 
-To reduce instrumentation boilerplate code, such as setting semantic conventions and propagating trace-context, an alternative auto-instrumentation library (Dynatrace.OpenTelemetry.Instrumentation) is provided to reduce additional code to instrument your functions. 
+To reduce instrumentation boilerplate code, such as setting semantic conventions and propagating trace-context, an alternative auto-instrumentation library (Dynatrace.OpenTelemetry.Instrumentation) is provided within this repository to demonstrate how to reduce additional required code to instrument your functions. 
 
+**Note on support for instrumentaiton libaries**
+Please note that the provided libraries are not part of Dynatrace product support policies. Dynatrace will release an official package, subject to use a different api. The provided libraries are free to use and modify.   
+
+#### Example
 The additional added code for instrumentation is marked with code-comments starting with *//Instrumentation:*
 
 ````
