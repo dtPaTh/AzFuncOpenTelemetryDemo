@@ -116,10 +116,8 @@ OpenTelemetry for .NET provides a broad set of [auto-instrumentation](https://gi
 
 To reduce instrumentation boilerplate code, such as setting semantic conventions and propagating trace-context, an alternative auto-instrumentation library (Dynatrace.OpenTelemetry.Instrumentation) is provided within this repository to demonstrate how to reduce additional required code to instrument your functions. 
 
-**Note on support for instrumentaiton libaries**
-Please note that the provided libraries are not part of Dynatrace product support policies. Dynatrace will release an official package, subject to use a different api. The provided libraries are free to use and modify.   
+**Please note that the provided libraries are not part of Dynatrace product support policies. Dynatrace will release an official package, subject to use a different api and featureset. The provided libraries within this tutorial are free to use and modify.**
 
-#### Example
 The additional added code for instrumentation is marked with code-comments starting with *//Instrumentation:*
 
 ````
